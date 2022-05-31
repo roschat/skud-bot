@@ -1,5 +1,6 @@
 import asyncio
 import locale
+import json
 from time import sleep
 
 import db_conn
@@ -41,11 +42,34 @@ def on_button_event(*args):
                 data=answer['txt']
             )
 
-
+def unpack_text_data(data) :
+    json_data = json.loads(data)
+    text = ''
+    if 'type' in json_data and json_data['type'] != 'text':
+        return ''
+    if 'text' in json_data :
+        text = json_data['text']
+    if 'entities' in json_data :
+        entities = json_data['entities']
+        update_text = text;
+        for entity in entities:
+            #pack contacts
+            if 'type' in entity and entity['type'] == 'contact':
+                if 'offset' not in entity or 'length' not in entity or 'contactId' not in entity: continue
+                fio = text[entity['offset']:entity['offset']+entity['length']]
+                contact = '@['+str(entity['contactId'])+':'+fio+']'
+                update_text = update_text.replace(fio, contact)
+        text = update_text
+    return text
 
 def on_message_event(*args):
     data = args[0]
     cid, data, _, data_type = [data[k] for k in ('cid', 'data', 'id', 'dataType')]
+    if data_type == 'data':
+        text = unpack_text_data(data)
+        if text != '' :
+            data_type = 'text'
+            data = text
     if data_type == 'text':
         answer = dispatch_message_event(data, cid)
         if answer is None:
